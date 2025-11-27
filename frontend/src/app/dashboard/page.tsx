@@ -1,9 +1,11 @@
 'use client';
+
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { tasksAPI } from '@/lib/api';
 
+// Interfaces MUST be outside the component
 interface Task {
   id: number;
   title: string;
@@ -12,11 +14,30 @@ interface Task {
   created_at: string;
 }
 
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  target: number;
+  icon: string;
+  completed: boolean;
+}
+
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Debug authentication
+  useEffect(() => {
+    console.log("Dashboard - User data:", user);
+    console.log("Dashboard - Is authenticated:", isAuthenticated);
+    console.log("Dashboard - LocalStorage user:", localStorage.getItem("user"));
+  }, [user, isAuthenticated]);
+
+  // Load tasks
   useEffect(() => {
     fetchTasks();
   }, []);
@@ -26,168 +47,271 @@ export default function DashboardPage() {
       const response = await tasksAPI.getAll();
       setTasks(response.data);
     } catch (error) {
-      console.error('Failed to fetch tasks');
+      console.error("Failed to fetch tasks", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Calculate task statistics
-  const completedTasks = tasks.filter(task => task.status === 'completed').length;
-  const inProgressTasks = tasks.filter(task => task.status === 'in-progress').length;
-  const pendingTasks = tasks.filter(task => task.status === 'pending').length;
+  // Task statistics
+  const completedTasks = tasks.filter((t) => t.status === "completed").length;
+  const inProgressTasks = tasks.filter((t) => t.status === "in-progress").length;
+  const pendingTasks = tasks.filter((t) => t.status === "pending").length;
   const totalTasks = tasks.length;
 
+  // Gamification calculations
+  const totalPoints = completedTasks * 50 + inProgressTasks * 10;
+  const currentLevel = Math.floor(totalPoints / 100) + 1;
+  const progressToNextLevel = totalPoints % 100;
+
+  // Achievements
+  const achievements: Achievement[] = [
+    {
+      id: "first-steps",
+      title: "First Steps",
+      description: "Complete your first task",
+      progress: completedTasks > 0 ? 1 : 0,
+      target: 1,
+      icon: "👣",
+      completed: completedTasks > 0,
+    },
+    {
+      id: "point-collector",
+      title: "Point Collector",
+      description: "Earn 500 points",
+      progress: totalPoints,
+      target: 500,
+      icon: "⭐",
+      completed: totalPoints >= 500,
+    },
+    {
+      id: "task-master",
+      title: "Task Master",
+      description: "Complete 10 tasks",
+      progress: completedTasks,
+      target: 10,
+      icon: "🏆",
+      completed: completedTasks >= 10,
+    },
+    {
+      id: "rising-star",
+      title: "Rising Star",
+      description: "Reach level 5",
+      progress: currentLevel,
+      target: 5,
+      icon: "🚀",
+      completed: currentLevel >= 5,
+    },
+    {
+      id: "elite-performer",
+      title: "Elite Performer",
+      description: "Reach level 10",
+      progress: currentLevel,
+      target: 10,
+      icon: "👑",
+      completed: currentLevel >= 10,
+    },
+    {
+      id: "champion",
+      title: "Champion",
+      description: "Complete 50 tasks",
+      progress: completedTasks,
+      target: 50,
+      icon: "💪",
+      completed: completedTasks >= 50,
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl shadow-xl">
-        <div className="px-6 py-8 sm:p-10">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Welcome back, {user?.name}! 👋
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Hello, {user?.name}! 👋
           </h1>
-          <p className="text-blue-100 text-lg">
-            {totalTasks === 0 
-              ? "Ready to organize your tasks and boost your productivity?"
-              : `You have ${totalTasks} task${totalTasks === 1 ? '' : 's'} to manage`}
-          </p>
+          <p className="text-xl text-gray-600">Keep up the great work!</p>
         </div>
-      </div>
 
-      {/* User Profile Card */}
-      <div className="bg-white overflow-hidden shadow-xl rounded-2xl border border-gray-100">
-        <div className="px-6 py-8 sm:p-10">
+        {/* Level Progress */}
+        <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">User Profile</h2>
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-lg">
-                {user?.name?.charAt(0).toUpperCase()}
-              </span>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Progress to Level {currentLevel + 1}
+              </h2>
+              <p className="text-gray-600">
+                Level {currentLevel} • {totalPoints} points
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-blue-600">Level {currentLevel}</div>
+              <div className="text-sm text-gray-500">{progressToNextLevel}/100 XP</div>
             </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className="block text-sm font-semibold text-gray-600">Full Name</label>
-              <p className="text-lg text-gray-900 font-medium">{user?.name}</p>
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-semibold text-gray-600">Email Address</label>
-              <p className="text-lg text-gray-900 font-medium">{user?.email}</p>
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-semibold text-gray-600">User ID</label>
-              <p className="text-lg text-gray-900 font-medium">{user?.id}</p>
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-semibold text-gray-600">Account Status</label>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                Active ✅
-              </span>
-            </div>
+
+          <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+            <div
+              className="bg-gradient-to-r from-blue-500 to-purple-600 h-4 rounded-full transition-all duration-500"
+              style={{ width: `${progressToNextLevel}%` }}
+            ></div>
           </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <StatCard label="Total Tasks" value={totalTasks} color="purple" />
+          <StatCard label="Pending" value={pendingTasks} color="yellow" />
+          <StatCard label="In Progress" value={inProgressTasks} color="blue" />
+          <StatCard label="Completed" value={completedTasks} color="green" />
+        </div>
+
+        {/* Quick Actions + Achievements */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+          {/* Quick Actions */}
+          <QuickActions />
+
+          {/* Achievements */}
+          <Achievements achievements={achievements} />
+
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Task Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mr-4">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Tasks</p>
-              <p className="text-2xl font-bold text-gray-900">{loading ? '...' : totalTasks}</p>
-            </div>
-          </div>
-        </div>
+/* ————————————————————————————————
+   REUSABLE SUB-COMPONENTS
+——————————————————————————————— */
 
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Completed</p>
-              <p className="text-2xl font-bold text-gray-900">{loading ? '...' : completedTasks}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mr-4">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">In Progress</p>
-              <p className="text-2xl font-bold text-gray-900">{loading ? '...' : inProgressTasks}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mr-4">
-              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-gray-900">{loading ? '...' : pendingTasks}</p>
-            </div>
-          </div>
-        </div>
+function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 text-center">
+      <div className={`text-3xl font-bold text-${color}-500 mb-2`}>
+        {value}
       </div>
+      <div className="text-gray-600 font-medium">{label}</div>
+    </div>
+  );
+}
 
-      {/* Quick Actions */}
-      <div className="bg-white shadow-xl rounded-2xl border border-gray-100">
-        <div className="px-6 py-8 sm:p-10">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link 
-              href="/dashboard/tasks" 
-              className="group p-6 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-lg transition-all duration-300"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-500 transition-colors">
-                  <svg className="w-6 h-6 text-blue-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600">View All Tasks</h3>
-                  <p className="text-gray-600 text-sm">See and manage your {totalTasks} task{totalTasks === 1 ? '' : 's'}</p>
-                </div>
-              </div>
-            </Link>
+function QuickActions() {
+  return (
+    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
+      <div className="grid grid-cols-1 gap-4">
 
-            <Link 
-              href="/dashboard/tasks/create" 
-              className="group p-6 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:shadow-lg transition-all duration-300"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-500 transition-colors">
-                  <svg className="w-6 h-6 text-green-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-600">Create New Task</h3>
-                  <p className="text-gray-600 text-sm">Add a new task to your list</p>
-                </div>
+        <Link
+          href="/dashboard/tasks"
+          className="group p-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
+        >
+          <ActionItem title="View Tasks" subtitle="Manage your task list" />
+        </Link>
+
+        <Link
+          href="/dashboard/tasks/create"
+          className="group p-6 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
+        >
+          <ActionItem title="Create New Task" subtitle="Add a new task" />
+        </Link>
+
+      </div>
+    </div>
+  );
+}
+
+function ActionItem({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="flex items-center space-x-4">
+      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+        <span className="text-white text-xl">📄</span>
+      </div>
+      <div className="text-left">
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <p className="text-blue-100 text-sm">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function Achievements({ achievements }: { achievements: Achievement[] }) {
+  return (
+    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Achievements</h2>
+      <div className="space-y-4 max-h-96 overflow-y-auto">
+
+        {achievements.map((achievement) => (
+          <div
+            key={achievement.id}
+            className={`p-4 rounded-2xl border-2 transition-all duration-300 ${
+              achievement.completed
+                ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-lg"
+                : "bg-gray-50 border-gray-200 hover:shadow-md"
+            }`}
+          >
+            <div className="flex items-center space-x-4">
+              <div
+                className={`text-2xl ${
+                  achievement.completed ? "scale-110" : "opacity-60"
+                }`}
+              >
+                {achievement.icon}
               </div>
-            </Link>
+
+              <div className="flex-1">
+                <h3
+                  className={`font-semibold ${
+                    achievement.completed ? "text-green-800" : "text-gray-800"
+                  }`}
+                >
+                  {achievement.title}
+                </h3>
+                <p className="text-sm text-gray-600 mb-2">
+                  {achievement.description}
+                </p>
+
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-500 ${
+                      achievement.completed
+                        ? "bg-gradient-to-r from-green-500 to-emerald-600"
+                        : "bg-gradient-to-r from-blue-500 to-purple-600"
+                    }`}
+                    style={{
+                      width: `${Math.min(
+                        (achievement.progress / achievement.target) * 100,
+                        100
+                      )}%`,
+                    }}
+                  ></div>
+                </div>
+
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>
+                    Progress: {achievement.progress}/{achievement.target}
+                  </span>
+                  {achievement.completed && (
+                    <span className="text-green-600 font-semibold">
+                      ✓ Completed
+                    </span>
+                  )}
+                </div>
+
+              </div>
+            </div>
           </div>
-        </div>
+        ))}
+
       </div>
     </div>
   );
